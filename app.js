@@ -1,61 +1,5 @@
-// 데이터 테이블: 간단한 NPS 외경(OD) & 두께(예시값)
-const PIPE_TABLE = {
-  '1"':  { OD_mm: 33.40,  SCH: { '40': 3.38, '80': 4.55, '160': 6.35 } },
-  '2"':  { OD_mm: 60.33,  SCH: { '40': 3.91, '80': 5.54, '160': 8.74 } },
-  '3"':  { OD_mm: 88.90,  SCH: { '40': 5.49, '80': 7.62, '160': 11.13 } },
-  '4"':  { OD_mm: 114.30, SCH: { '40': 6.02, '80': 8.56, '160': 13.49 } },
-  '6"':  { OD_mm: 168.28, SCH: { '40': 7.11, '80': 10.97,'160': 18.26 } },
-};
-
-// 상태
-const state = {
-  structure: 'horizontal',
-  direction: 'right',
-  unit: 'mm',
-  nominalSize: '2"',
-  schedule: '80',
-  material: 'CS',
-  items: [] // {type,len,rot}
-};
-
-// 엘리먼트
+// ===== Helpers =====
 const svg = document.getElementById('svg');
-const list = document.getElementById('list');
-const specEl = document.getElementById('spec');
-
-// 컨트롤 바인딩
-['structure','direction','unit','nominalSize','schedule','material'].forEach(id=>{
-  document.getElementById(id).onchange = e => { state[id] = e.target.value; render(); };
-});
-
-document.querySelectorAll('[data-add]').forEach(btn => {
-  btn.onclick = () => {
-    const type = btn.dataset.add;
-    let len = parseFloat(document.getElementById('len').value||'0') || 0;
-    if(state.unit==='inch') len = len*25.4; // 내부는 mm
-    state.items.push({type, len, rot:0});
-    render();
-  };
-});
-
-document.getElementById('btnReset').onclick = ()=>{ state.items=[]; render(); };
-document.getElementById('btnExportPng').onclick = ()=> exportPNG();
-document.getElementById('btnPrint').onclick = ()=> printPDFLike();
-document.getElementById('btnSave').onclick = ()=> {
-  const data = new Blob([JSON.stringify(state)],{type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(data); a.download='piping.json'; a.click();
-  URL.revokeObjectURL(a.href);
-};
-document.getElementById('btnLoad').onclick = ()=> document.getElementById('fileLoad').click();
-document.getElementById('fileLoad').onchange = e=>{
-  const f = e.target.files[0]; if(!f) return;
-  const r = new FileReader();
-  r.onload = ()=>{ Object.assign(state, JSON.parse(r.result)); render(); };
-  r.readAsText(f);
-};
-
-// 유틸
 function clearSVG(){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
 function line(x1,y1,x2,y2,opts={}){
   const el = document.createElementNS('http://www.w3.org/2000/svg','line');
@@ -83,135 +27,217 @@ function rect(x,y,w,h,opts={}){
   el.setAttribute('stroke-width', opts.w || 4);
   svg.appendChild(el); return el;
 }
-function text(x,y,txt){ const el = document.createElementNS('http://www.w3.org/2000/svg','text'); el.setAttribute('x',x); el.setAttribute('y',y); el.setAttribute('class','dimtxt'); el.textContent = txt; svg.appendChild(el); return el; }
-
-// 심볼
-function drawValve(cx,cy,size=60){ poly([[cx-size/2,cy-size/2],[cx,cy],[cx-size/2,cy+size/2]]); poly([[cx+size/2,cy-size/2],[cx,cy],[cx+size/2,cy+size/2]]); }
-function drawGate(cx,cy,size=60){ rect(cx-size/2,cy-size/2,size,size); line(cx-size/2,cy,cx+size/2,cy); }
-function drawGlobe(cx,cy,size=60){ rect(cx-size/2,cy-size/2,size,size,{fill:'none'}); poly([[cx-size/2,cy],[cx,cy-size/2],[cx+size/2,cy],[cx,cy+size/2],[cx-size/2,cy]]); }
-function drawCheck(cx,cy,size=60){ rect(cx-size/2,cy-size/2,size,size); poly([[cx-size/5,cy],[cx+size/3,cy-size/3],[cx+size/3,cy+size/3],[cx-size/5,cy]]); }
-function drawStrainer(cx,cy,size=60){ rect(cx-size/2,cy-size/2,size,size); poly([[cx-size/2,cy-size/2],[cx+size/2,cy+size/2]]); }
-function drawTrap(cx,cy,size=60){ rect(cx-size/2,cy-size/2,size,size); text(cx-size/4,cy+size/4,'TR'); }
-
+function text(x,y,txt,opts={}){
+  const el = document.createElementNS('http://www.w3.org/2000/svg','text');
+  el.setAttribute('x',x); el.setAttribute('y',y);
+  el.setAttribute('fill', opts.color || '#e9e9e9');
+  el.setAttribute('font-size', opts.size || 14);
+  svg.appendChild(el); el.textContent = txt; return el;
+}
 function arrow(x,y,dir,len=90){
   if(dir==='right'){ line(x,y,x+len,y,{w:3}); poly([[x+len,y],[x+len-12,y-8],[x+len-12,y+8],[x+len,y]],{w:3}); }
   if(dir==='left'){ line(x,y,x-len,y,{w:3}); poly([[x-len,y],[x-len+12,y-8],[x-len+12,y+8],[x-len,y]],{w:3}); }
   if(dir==='up'){ line(x,y,x,y-len,{w:3}); poly([[x,y-len],[x-8,y-len+12],[x+8,y-len+12],[x,y-len]],{w:3}); }
   if(dir==='down'){ line(x,y,x,y+len,{w:3}); poly([[x,y+len],[x-8,y+len-12],[x+8,y+len-12],[x,y+len]],{w:3}); }
 }
-function dimension(x1,y1,x2,y2,labelTxt){
-  line(x1,y1-10,x1,y1+10,{w:3}); line(x2,y2-10,x2,y2+10,{w:3}); line(x1,y1,x2,y2,{w:2}); text((x1+x2)/2 - (labelTxt.length*3), y1-14, labelTxt);
+
+// Symbols
+function drawValve(cx,cy,size=60){ poly([[cx-size/2,cy-size/2],[cx,cy],[cx-size/2,cy+size/2]]); poly([[cx+size/2,cy-size/2],[cx,cy],[cx+size/2,cy+size/2]]); }
+function drawTrap(cx,cy,size=60){ rect(cx-size/2,cy-size/2,size,size); text(cx-14,cy+5,'TR'); }
+
+// ===== Wizard dynamic inputs =====
+const countValve = document.getElementById('countValve');
+const countTrap = document.getElementById('countTrap');
+const countPipe = document.getElementById('countPipe');
+const pipeInputs = document.getElementById('pipeInputs');
+const totalLen = document.getElementById('totalLen');
+const valveLen = document.getElementById('valveLen');
+const trapLen = document.getElementById('trapLen');
+const sumInfo = document.getElementById('sumInfo');
+
+function rebuildPipeInputs(){
+  pipeInputs.innerHTML = '';
+  const n = Math.max(1, parseInt(countPipe.value||'1',10));
+  for(let i=1;i<=n;i++){
+    const wrap = document.createElement('div');
+    const inp = document.createElement('input');
+    inp.type='number'; inp.min='0'; inp.value = i===1 ? 300 : 200;
+    inp.id = 'pipeLen'+i;
+    const lab = document.createElement('label');
+    lab.textContent = `배관 ${i} 길이(mm)`;
+    wrap.appendChild(lab); wrap.appendChild(inp);
+    wrap.style.display='flex'; wrap.style.flexDirection='column';
+    pipeInputs.appendChild(wrap);
+    inp.oninput = updateSumInfo;
+  }
+  updateSumInfo();
+}
+function parsePipeLens(){
+  const n = Math.max(1, parseInt(countPipe.value||'1',10));
+  let arr=[];
+  for(let i=1;i<=n;i++){
+    const v = parseFloat(document.getElementById('pipeLen'+i).value||'0');
+    arr.push(isNaN(v)?0:v);
+  }
+  return arr;
+}
+function updateSumInfo(){
+  const arr = parsePipeLens();
+  const sumPipes = arr.reduce((a,b)=>a+b,0);
+  const sumValves = (parseInt(countValve.value||'0')||0) * (parseFloat(valveLen.value||'0')||0);
+  const sumTraps = (parseInt(countTrap.value||'0')||0) * (parseFloat(trapLen.value||'0')||0);
+  const total = sumPipes + sumValves + sumTraps;
+  const target = parseFloat(totalLen.value||'0')||0;
+  const diff = total - target;
+  sumInfo.innerHTML = `배관합 ${sumPipes} + 밸브합 ${sumValves} + 트랩합 ${sumTraps} = <b>${total} mm</b>` +
+    (target>0 ? (Math.abs(diff)<1 ? ` <span class="ok">(총길이와 일치)</span>` : ` <span class="warn">(총길이와 ${diff>0?'+'+diff:diff} mm 차이)</span>`) : '');
 }
 
-function label(t){ return ({pipe:'배관',valve:'일반밸브',gate:'게이트',globe:'글로브',check:'체크',strainer:'스트레이너',trap:'트랩'})[t] || t; }
-function drawSymbol(type, cx, cy, size=60){
-  if(type==='valve') return drawValve(cx,cy,size);
-  if(type==='gate') return drawGate(cx,cy,size);
-  if(type==='globe') return drawGlobe(cx,cy,size);
-  if(type==='check') return drawCheck(cx,cy,size);
-  if(type==='strainer') return drawStrainer(cx,cy,size);
-  if(type==='trap') return drawTrap(cx,cy,size);
+// events
+[countValve,countTrap,countPipe,totalLen,valveLen,trapLen].forEach(el=> el.oninput = ()=>{
+  if(el===countPipe) rebuildPipeInputs(); else updateSumInfo();
+});
+rebuildPipeInputs();
+
+// ===== Generate Diagram =====
+const direction = document.getElementById('direction');
+const material = document.getElementById('material');
+const sizeSel = document.getElementById('size');
+const schedule = document.getElementById('schedule');
+const equipName = document.getElementById('equipName');
+const equipLoc = document.getElementById('equipLoc');
+
+const titleTop = document.getElementById('titleTop');
+const titleMid = document.getElementById('titleMid');
+const titleDir = document.getElementById('titleDir');
+const lengthSummary = document.getElementById('lengthSummary');
+
+function genTitle(){
+  titleTop.textContent = `${equipLoc.value||'설비위치'}  ${equipName.value||'설비명'}`;
+  titleMid.textContent = `${material.value}  ${sizeSel.value}  ${schedule.value}`;
+  titleDir.textContent = `방향: ${dirLabel(direction.value)}`;
+}
+function dirLabel(d){ return {right:'→',left:'←',up:'↑',down:'↓'}[d] || d; }
+
+function drawDimension(x1,y1,x2,y2,labelTxt){
+  line(x1,y1-10,x1,y1+10,{w:3}); line(x2,y2-10,x2,y2+10,{w:3}); line(x1,y1,x2,y2,{w:2});
+  text((x1+x2)/2 - (labelTxt.length*3), y1-14, labelTxt);
 }
 
-// 메인 렌더
-function render(){
+function generate(){
+  genTitle();
   clearSVG();
-  // 규격 정보
-  const spec = PIPE_TABLE[state.nominalSize];
-  const t = spec ? spec.SCH[state.schedule] : undefined;
-  const od = spec ? spec.OD_mm : undefined;
-  specEl.textContent = spec ? `NPS ${state.nominalSize} / SCH ${state.schedule} → OD ${od.toFixed(2)} mm, t ${t.toFixed(2)} mm` : '-';
 
-  // 방향 라벨
-  arrow(260,140,state.direction,90);
-  text(370,146, `방향:${dirLabel(state.direction)}  재질:${state.material}  크기:${state.nominalSize}  SCH:${state.schedule}`);
+  // direction arrow
+  arrow(240,120,direction.value,90);
 
-  const margin = 140;
-  let x = margin, y = 520;
-  let totalPipe = 0;
+  const layout = document.querySelector('input[name="layout"]:checked').value;
+  const nValve = Math.max(0, parseInt(countValve.value||'0',10));
+  const nTrap  = Math.max(0, parseInt(countTrap.value||'0',10));
+  const nPipe  = Math.max(1, parseInt(countPipe.value||'1',10));
+  const vLen = Math.max(0, parseFloat(valveLen.value||'0'));
+  const tLen = Math.max(0, parseFloat(trapLen.value||'0'));
+  const pipes = parsePipeLens();
 
-  if(state.structure==='horizontal'){
-    let currX = x;
-    state.items.forEach(it=>{
-      if(it.type==='pipe'){
-        line(currX,y,currX+it.len,y);
-        currX += it.len; totalPipe += it.len;
-      }else{
-        drawSymbol(it.type,currX+30,y,60);
-        currX += 60;
-      }
-    });
-    dimension(x,y+70,currX,y+70,`총 배관 길이: ${fmtLen(totalPipe)}`);
-  }else if(state.structure==='vertical'){
-    let currY = y-240;
-    state.items.forEach(it=>{
-      if(it.type==='pipe'){
-        line(x,currY,x,currY+it.len);
-        currY += it.len; totalPipe += it.len;
-      }else{
-        drawSymbol(it.type,x,currY+30,60);
-        currY += 60;
-      }
-    });
-    dimension(x+70,y-240,x+70,y-240+totalPipe,`총 배관 길이: ${fmtLen(totalPipe)}`);
-  }else if(state.structure==='elbow'){
-    const tgt = totalPipeLen()/2;
-    let left = tgt;
-    let cx = x, cy = y;
-    state.items.forEach(it=>{
-      if(it.type==='pipe'){
-        if(left>0){
-          const seg = Math.min(left, it.len);
-          line(cx,cy,cx+seg,cy); cx+=seg; left-=seg;
-          const remain = it.len - seg;
-          if(remain>0){ line(cx,cy,cx,cy+remain); cy+=remain; }
-        }else{
-          line(cx,cy,cx,cy+it.len); cy+=it.len;
-        }
-        totalPipe += it.len;
-      }else{
-        if(left>0){ drawSymbol(it.type,cx+30,cy,60); cx+=60; }
-        else { drawSymbol(it.type,cx,cy+30,60); cy+=60; }
-      }
-    });
-    dimension(x,y+70,x+tgt,y+70,`수평: ${fmtLen(tgt)}`);
-    dimension(x+70,y,x+70,y+(totalPipe - tgt),`수직: ${fmtLen(totalPipe - tgt)}`);
+  // Compose sequence for series: P1, Valve1, P2, Trap1, P3, Valve2, P4, Trap2, ...
+  const seq = [];
+  let pi = 0, vi = 0, ti = 0;
+  while(pi < nPipe || vi < nValve || ti < nTrap){
+    if(pi < nPipe){ seq.push({type:'pipe', len:pipes[pi], label:`배관 ${pi+1} (${pipes[pi]}mm)`}); pi++; }
+    if(vi < nValve){ seq.push({type:'valve', len:vLen, label:`밸브 ${vi+1} (${vLen}mm)`}); vi++; }
+    if(ti < nTrap){ seq.push({type:'trap', len:tLen, label:`트랩 ${ti+1} (${tLen}mm)`}); ti++; }
   }
 
-  // 리스트
-  renderList();
-  // 저장
-  localStorage.setItem('pipingProState', JSON.stringify(state));
+  const total = pipes.reduce((a,b)=>a+b,0) + nValve*vLen + nTrap*tLen;
+  lengthSummary.textContent = `총 길이: ${total} mm`;
+
+  if(layout==='series'){
+    drawSeries(seq);
+  }else{
+    drawParallel(seq);
+  }
 }
 
-function totalPipeLen(){ return state.items.filter(i=>i.type==='pipe').reduce((a,b)=>a+(b.len||0),0); }
-function fmtLen(mm){ return state.unit==='mm' ? `${Math.round(mm)} mm` : `${(mm/25.4).toFixed(2)} in`; }
-function dirLabel(d){ return {right:'오른쪽',left:'왼쪽',up:'위쪽',down:'아래쪽'}[d]; }
-
-function renderList(){
-  list.innerHTML='';
-  state.items.forEach((it,i)=>{
-    const row = document.createElement('div'); row.className='item';
-    const span = document.createElement('span'); span.className='grow';
-    span.textContent = `${i+1}. ${label(it.type)} ${it.type==='pipe' ? '('+fmtLen(it.len)+')' : ''}`;
-    const up = document.createElement('button'); up.textContent='↑'; up.onclick=()=>{ if(i>0){ [state.items[i-1],state.items[i]]=[state.items[i],state.items[i-1]]; render(); } };
-    const down = document.createElement('button'); down.textContent='↓'; down.onclick=()=>{ if(i<state.items.length-1){ [state.items[i+1],state.items[i]]=[state.items[i],state.items[i+1]]; render(); } };
-    const edit = document.createElement('button'); edit.textContent='수정'; edit.onclick=()=>{
-      if(it.type==='pipe'){
-        const v = prompt('길이(mm 또는 현재 단위):', state.unit==='mm' ? it.len : (it.len/25.4).toFixed(2));
-        if(v!==null){ let mm = parseFloat(v)||0; if(state.unit==='inch') mm*=25.4; it.len = mm; render(); }
-      } else {
-        alert('심볼 회전은 필요시 구조/방향으로 제어하세요.');
-      }
-    };
-    const del = document.createElement('button'); del.textContent='삭제'; del.onclick=()=>{ state.items.splice(i,1); render(); };
-    row.append(span, up, down, edit, del);
-    list.appendChild(row);
+function drawSeries(seq){
+  const margin = 140;
+  let x = margin, y = 520;
+  let currX = x;
+  seq.forEach(s=>{
+    if(s.type==='pipe'){
+      line(currX,y,currX+s.len,y);
+      text(currX + s.len/2 - 20, y-10, `${s.len}mm`);
+      drawDimension(currX, y+60, currX+s.len, y+60, s.label);
+      currX += s.len;
+    } else if(s.type==='valve'){
+      drawValve(currX+30,y,60);
+      text(currX+10, y-12, `${s.len}mm`);
+      drawDimension(currX, y+60, currX+60, y+60, s.label);
+      currX += 60;
+    } else if(s.type==='trap'){
+      drawTrap(currX+30,y,60);
+      text(currX+10, y-12, `${s.len}mm`);
+      drawDimension(currX, y+60, currX+60, y+60, s.label);
+      currX += 60;
+    }
   });
+  drawDimension(140, y+100, currX, y+100, `총 길이 ${document.getElementById('totalLen').value||'-'} mm (계산:${seqLength(seq)} mm)`);
 }
 
-// PNG 내보내기
-function exportPNG(){
+function drawParallel(seq){
+  // Split into two rows roughly half each by length
+  const rowA = [], rowB = [];
+  let lenA=0,lenB=0;
+  seq.forEach(s=>{
+    const l = s.type==='pipe'?s.len:60;
+    if(lenA<=lenB){ rowA.push(s); lenA += l; } else { rowB.push(s); lenB += l; }
+  });
+
+  const baseX = 140;
+  const yA = 420, yB = 620;
+
+  const drawRow = (row,y)=>{
+    let cx = baseX;
+    row.forEach(s=>{
+      if(s.type==='pipe'){
+        line(cx,y,cx+s.len,y);
+        text(cx + s.len/2 - 20, y-10, `${s.len}mm`);
+        drawDimension(cx, y+50, cx+s.len, y+50, s.label);
+        cx += s.len;
+      } else if(s.type==='valve'){
+        drawValve(cx+30,y,60);
+        text(cx+10, y-12, `${s.len}mm`);
+        drawDimension(cx, y+50, cx+60, y+50, s.label);
+        cx += 60;
+      } else if(s.type==='trap'){
+        drawTrap(cx+30,y,60);
+        text(cx+10, y-12, `${s.len}mm`);
+        drawDimension(cx, y+50, cx+60, y+50, s.label);
+        cx += 60;
+      }
+    });
+    drawDimension(baseX, y+80, cx, y+80, `라인 길이 ${rowLength(row)} mm`);
+  };
+
+  drawRow(rowA, yA);
+  drawRow(rowB, yB);
+}
+
+function rowLength(row){ return row.reduce((a,s)=> a + (s.type==='pipe'?s.len: (s.type==='valve'||s.type==='trap'? (s.len) : 0)), 0); }
+function seqLength(seq){ return rowLength(seq); }
+
+// Buttons
+document.getElementById('btnGen').onclick = generate;
+document.getElementById('btnReset').onclick = ()=>{
+  document.getElementById('equipName').value='';
+  document.getElementById('equipLoc').value='';
+  clearSVG();
+  document.getElementById('titleTop').textContent = '설비위치  설비명';
+  document.getElementById('titleMid').textContent = '재질  크기  스케쥴';
+  document.getElementById('titleDir').textContent = '방향: →';
+  document.getElementById('lengthSummary').textContent = '총 길이: -';
+};
+
+document.getElementById('btnExport').onclick = ()=>{
   const s = new XMLSerializer().serializeToString(svg);
   const blob = new Blob([s], {type:'image/svg+xml;charset=utf-8'});
   const url = URL.createObjectURL(blob);
@@ -224,24 +250,16 @@ function exportPNG(){
     ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.drawImage(img,0,0);
     const a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png'); a.download='piping.png'; a.click();
+    a.href = canvas.toDataURL('image/png'); a.download='piping_wizard.png'; a.click();
     URL.revokeObjectURL(url);
   };
   img.src = url;
-}
+};
 
-// 인쇄(PDF 저장용)
-function printPDFLike(){
+document.getElementById('btnPrint').onclick = ()=>{
   const win = window.open('','_blank');
   const s = new XMLSerializer().serializeToString(svg);
-  win.document.write(`<html><head><title>Piping Print</title><style>body{margin:0;background:#fff}</style></head><body>${s}</body></html>`);
+  win.document.write(`<html><head><title>Print</title><style>body{margin:0;background:#fff}</style></head><body>${s}</body></html>`);
   win.document.close();
-  setTimeout(()=>win.print(), 300);
-}
-
-// 상태 복원
-try{
-  const saved = localStorage.getItem('pipingProState');
-  if(saved) Object.assign(state, JSON.parse(saved));
-}catch(e){}
-render();
+  setTimeout(()=>win.print(),300);
+};

@@ -1,6 +1,6 @@
 {
-  "name": "Piping PWA Pro",
-  "short_name": "PipingPro",
+  "name": "Piping Wizard",
+  "short_name": "PipeWizard",
   "display": "standalone",
   "start_url": ".",
   "background_color": "#111111",
