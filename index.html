@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Piping PWA Pro – 배관 도면</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111111">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <style>
+    :root { --bg:#111; --fg:#eee; --muted:#bbb; }
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Pretendard,sans-serif}
+    body{margin:0;background:#111;color:var(--fg);}
+    header{position:sticky;top:0;z-index:5;background:#111;border-bottom:1px solid #2a2a2a;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    h1{font-size:16px;margin:0 8px 0 0}
+    select,input,button{background:#1b1b1b;border:1px solid #333;color:var(--fg);padding:8px;border-radius:8px}
+    button{cursor:pointer}
+    #grid{display:grid;grid-template-columns:1fr;gap:8px}
+    #toolbar{padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid #2a2a2a}
+    #svg{width:100%;height:64vh;border:1px dashed #2a2a2a;border-radius:12px;background:#000;margin:10px 0}
+    #info{padding:8px 12px;color:var(--muted);font-size:12px}
+    #list{padding:8px 12px;display:flex;flex-direction:column;gap:8px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .item{display:flex;gap:8px;align-items:center;background:#181818;border:1px solid #2a2a2a;border-radius:10px;padding:6px 8px}
+    .grow{flex:1}
+    .pill{border:1px solid #333;border-radius:999px;padding:4px 8px;font-size:12px}
+    .dimtxt{fill:#e9e9e9;font-size:14px}
+    .mt8{margin-top:8px}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Piping PWA Pro</h1>
+  <button id="btnExportPng">PNG</button>
+  <button id="btnPrint">PDF(인쇄)</button>
+  <button id="btnSave">저장(JSON)</button>
+  <input id="fileLoad" type="file" accept="application/json" style="display:none"/>
+  <button id="btnLoad">불러오기</button>
+  <button id="btnReset">초기화</button>
+  <span class="pill">오프라인 가능</span>
+</header>
+
+<div id="grid">
+  <div id="toolbar">
+    <div class="row">
+      <label>구조</label>
+      <select id="structure">
+        <option value="horizontal">가로</option>
+        <option value="vertical">세로</option>
+        <option value="elbow">ㄱ자</option>
+      </select>
+
+      <label>방향</label>
+      <select id="direction">
+        <option value="right">→</option>
+        <option value="left">←</option>
+        <option value="up">↑</option>
+        <option value="down">↓</option>
+      </select>
+
+      <label>단위</label>
+      <select id="unit">
+        <option value="mm">mm</option>
+        <option value="inch">inch</option>
+      </select>
+
+      <label>크기</label>
+      <select id="nominalSize">
+        <option>1"</option><option>2"</option><option>3"</option>
+        <option>4"</option><option>6"</option>
+      </select>
+
+      <label>Schedule</label>
+      <select id="schedule">
+        <option>40</option><option>80</option><option>160</option>
+      </select>
+
+      <label>재질</label>
+      <select id="material">
+        <option>CS</option><option>SS304</option><option>SS316</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <label>부품 추가</label>
+      <button data-add="pipe">배관</button>
+      <button data-add="gate">게이트</button>
+      <button data-add="globe">글로브</button>
+      <button data-add="check">체크</button>
+      <button data-add="strainer">스트레이너</button>
+      <button data-add="valve">일반밸브</button>
+      <button data-add="trap">트랩</button>
+      <label>길이</label>
+      <input id="len" type="number" value="300" style="width:90px"/>
+    </div>
+  </div>
+
+  <div style="padding:0 12px">
+    <svg id="svg" viewBox="0 0 1600 1000"></svg>
+  </div>
+
+  <div id="info">규격정보: <span id="spec"></span></div>
+
+  <div id="list"></div>
+</div>
+
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+</script>
+</body>
+</html>
